@@ -144,24 +144,29 @@ func backup(file string) {
 
 // CopyDir copies all the files in the copy dir at ~/
 func copyDir() {
-	applyCmd("copy", func(fileToCopy string) *exec.Cmd {
-		return exec.Command("cp", fileToCopy, RootDir)
+	applyCmd("copy", func(fileToCopy string) error {
+		return exec.Command("cp", fileToCopy, RootDir).Run()
 	})
 }
 
 // LinkDir links all the files in the link dir at ~/
 func linkDir() {
-	applyCmd("link", func(fileToLink string) *exec.Cmd {
-		return exec.Command("ln", "-sf", fileToLink, RootDir)
+	applyCmd("link", func(file string) error {
+		return exec.Command("ln", "-sf", file, RootDir).Run()
 	})
 }
 
 // InitDir executes all the scripts in the init dir
 func initDir() []byte {
-	out := applyCmd("init", func(initFile string) *exec.Cmd {
-		return exec.Command("/bin/bash", initFile)
+	var out []byte
+
+	applyCmd("init", func(initFile string) error {
+		output, err := exec.Command("/bin/bash", initFile).CombinedOutput()
+		out = append(out, output...)
+		return err
 	})
-	if len(out) != 0 {
+
+	if !quietMode && len(out) != 0 {
 		fmt.Printf("%s", string(out))
 	}
 	return out
@@ -170,22 +175,13 @@ func initDir() []byte {
 // SourceDir source all the files in the source dir
 // Solution from here: http://stackoverflow.com/a/29995987/1292605
 func sourceDir() {
-	dir := "source"
-	dirPath := filepath.Join(BaseDir, dir)
+	applyCmd("source", func(file string) error {
+		printHeader("Sourcing " + file)
 
-	files, readErr := ioutil.ReadDir(dirPath)
-	if readErr != nil {
-		fmt.Errorf("Failed to read %s dir at %s", dir, dirPath)
-	}
-
-	for _, file := range files {
-		printHeader("Sourcing " + file.Name())
-		fileToSource := filepath.Join(dirPath, file.Name())
-
-		cmd := exec.Command("/bin/bash", "-c", "source "+fileToSource+" ; echo '<<<ENVIRONMENT>>>' ; env")
+		cmd := exec.Command("/bin/bash", "-c", "source "+file+" ; echo '<<<ENVIRONMENT>>>' ; env")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			fmt.Errorf("Failed to source %s", file.Name())
+			return err
 		}
 
 		s := bufio.NewScanner(bytes.NewReader(out))
@@ -201,10 +197,11 @@ func sourceDir() {
 			}
 		}
 
-	}
+		return nil
+	})
 }
 
-func applyCmd(dir string, cmdFactory func(string) *exec.Cmd) []byte {
+func applyCmd(dir string, execCmd func(string) error) {
 	dirPath := filepath.Join(BaseDir, dir)
 
 	files, readErr := ioutil.ReadDir(dirPath)
@@ -212,26 +209,10 @@ func applyCmd(dir string, cmdFactory func(string) *exec.Cmd) []byte {
 		fmt.Errorf("Failed to read %s dir at %s", dir, dirPath)
 	}
 
-	output := []byte{}
-
 	for _, file := range files {
-		fileToCopy := filepath.Join(dirPath, file.Name())
-
-		cmd := cmdFactory(fileToCopy)
-		if debugMode {
-			fmt.Printf("=> Executing: %s\n", strings.Join(cmd.Args, " "))
-		}
-
-		out, err := cmd.CombinedOutput()
+		err := execCmd(filepath.Join(dirPath, file.Name()))
 		if err != nil {
-			fmt.Errorf("Failed to %s file: %s", dir, fileToCopy)
+			fmt.Errorf("Failed to %s file: %s", dir, file.Name())
 		}
-		if debugMode {
-			fmt.Printf("%s\n", string(out))
-		}
-		output = append(output, out...)
-
 	}
-
-	return output
 }
