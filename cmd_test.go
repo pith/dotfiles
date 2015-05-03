@@ -23,7 +23,7 @@ import (
 // Setup a temporary dir where the tests are run and cleanup at the end
 func TestMain(m *testing.M) {
 	quietMode = true
-	
+
 	tmpDir, err := ioutil.TempDir("", "go-test")
 	if err != nil {
 		fmt.Errorf("Failed to create tmp dir: %v", err)
@@ -38,8 +38,8 @@ func TestMain(m *testing.M) {
 	}
 	res := m.Run()
 
-	err2 := os.RemoveAll(RootDir)
-	if err2 != nil {
+	err = os.RemoveAll(RootDir)
+	if err != nil {
 		log.Fatal(err)
 	}
 
@@ -54,6 +54,37 @@ func TestInitDotfilesDir(t *testing.T) {
 	// Check if all the expected directories are present
 	for _, dirName := range expectedDirs {
 		isPresent(t, BaseDir, dirName)
+	}
+
+	// Cleanup for TestCloneDir
+	err := os.RemoveAll(RootDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func TestCloneDir(t *testing.T) {
+
+	cloneRepo("_dotfilesSample")
+
+	if _, err := os.Stat(BaseDir); os.IsNotExist(err) {
+		t.Errorf("no such file or directory: %s", BaseDir)
+		return
+	}
+}
+
+func TestBackupFile(t *testing.T) {
+	file := "fileToBackup"
+
+	err := ioutil.WriteFile(filepath.Join(RootDir, file), []byte("some old config"), 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	backup(file)
+
+	if _, err := os.Stat(filepath.Join(BaseDir, "backup", file)); os.IsNotExist(err) {
+		t.Errorf("Failed to backup %s", filepath.Join(RootDir, file))
 	}
 }
 
@@ -117,14 +148,11 @@ foo
 	}
 }
 
-// ignore
-func _TestSource(t *testing.T) {
+func TestSource(t *testing.T) {
 	initialize()
 
 	feedDir("source", 1)("echo plop; export FOO=\"youpi !!\"; env")
 
-	testEnv = true
-	
 	sourceDir()
 
 	if os.Getenv("FOO") != "youpi !!" {
