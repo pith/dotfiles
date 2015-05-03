@@ -14,6 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"os/user"
@@ -30,6 +31,7 @@ var help = `usage: dotfiles [command]
 
 The commands are:
   create    Create a new .dotfiles directory
+  get [url] Clone the git repo at the given URL     
   init      Initialize your config difine in the .dotfiles dir
 `
 
@@ -65,6 +67,8 @@ func main() {
 
 	if command == "create" {
 		initialize()
+	} else if command == "get" {
+		cloneRepo(flag.Arg(1))
 	} else if command == "init" {
 		printHeader("Copying files into home directory")
 		copyDir()
@@ -75,7 +79,7 @@ func main() {
 		printHeader("Run the following init scripts")
 		initDir()
 
-		sourceDir()
+		//sourceDir()
 
 		printHeader("All done !")
 	} else {
@@ -125,7 +129,54 @@ func cloneRepo(gitrepo string) {
 	printHeader(BaseDir + " is ready !")
 }
 
-func backup(file string) {
+// BackgroundCheck verifies if there are some actions to do on the given file
+// Returns true if the destination file doesn't exist or if it is different
+// from the source file
+func backgroundCheck(file string) bool {
+	source, err := os.Stat(file)
+	if err != nil && os.IsNotExist(err) {
+		// Can't background check a file which doesn't exists
+		fmt.Errorf("%s: no such file or directory", file)
+	}
+
+	_, err = os.Stat(filepath.Join(RootDir, filepath.Base(file)))
+	if err != nil && os.IsNotExist(err) {
+		// The destination file doesn't exist so go ahead
+		return true
+	}
+
+	if !source.Mode().IsRegular() {
+		// Don't do a deep check on non-regular files (eg. directories, link, etc.),
+		// so if the destination file exists don't do anything
+		return false
+	}
+
+	// Deep comparison between the two files
+	sf, err := os.Open(file)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	df, err := os.Open(filepath.Join(RootDir, filepath.Base(file)))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sscan := bufio.NewScanner(sf)
+	dscan := bufio.NewScanner(df)
+
+	for sscan.Scan() {
+		dscan.Scan()
+		if !bytes.Equal(sscan.Bytes(), dscan.Bytes()) {
+			return true
+		}
+	}
+
+	return false
+
+}
+
+func backupIfExist(file string) {
 	// If there is no backup dir yet create it
 	if _, err := os.Stat(filepath.Join(BaseDir, "backup")); os.IsNotExist(err) {
 		os.Mkdir(filepath.Join(BaseDir, "backup"), 0777)
@@ -145,29 +196,65 @@ func backup(file string) {
 // CopyDir copies all the files in the copy dir at ~/
 func copyDir() {
 	applyCmd("copy", func(fileToCopy string) error {
-		return exec.Command("cp", fileToCopy, RootDir).Run()
+		if firstInit() {
+			backupIfExist(fileToCopy)
+		}
+
+		if backgroundCheck(fileToCopy) {
+			return exec.Command("cp", fileToCopy, RootDir).Run()
+		}
+		return nil
 	})
 }
 
 // LinkDir links all the files in the link dir at ~/
 func linkDir() {
 	applyCmd("link", func(file string) error {
-		return exec.Command("ln", "-sf", file, RootDir).Run()
+		if firstInit() {
+			backupIfExist(file)
+		}
+
+		if backgroundCheck(file) {
+			return exec.Command("ln", "-sf", file, RootDir).Run()
+		}
+		return nil
 	})
+}
+
+func firstInit() bool {
+	if _, err := os.Stat(filepath.Join(BaseDir, "cache")); os.IsNotExist(err) {
+		return true
+	}
+	return false
+}
+
+func setupCache() {
+	err := os.Mkdir(filepath.Join(BaseDir, "cache"), 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // InitDir executes all the scripts in the init dir
 func initDir() []byte {
 	var out []byte
 
-	applyCmd("init", func(initFile string) error {
-		output, err := exec.Command("/bin/bash", initFile).CombinedOutput()
-		out = append(out, output...)
-		return err
-	})
+	// TODO add the possibility to run them again based on user input
+	if firstInit() {
+		applyCmd("init", func(initFile string) error {
+			printHeader("Run " + initFile)
 
-	if !quietMode && len(out) != 0 {
-		fmt.Printf("%s", string(out))
+			output, err := exec.Command("/bin/bash", initFile).CombinedOutput()
+			out = append(out, output...)
+			return err
+		})
+
+		if !quietMode && len(out) != 0 {
+			fmt.Printf("%s", string(out))
+		}
+
+		// Add cache to skip the init phase in next runs
+		setupCache()
 	}
 	return out
 }

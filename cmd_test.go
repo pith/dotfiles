@@ -46,6 +46,13 @@ func TestMain(m *testing.M) {
 	os.Exit(res)
 }
 
+func cleanup() {
+	err := os.RemoveAll(BaseDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func TestInitDotfilesDir(t *testing.T) {
 	initialize()
 
@@ -61,6 +68,8 @@ func TestInitDotfilesDir(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	cleanup()
 }
 
 func TestCloneDir(t *testing.T) {
@@ -71,25 +80,55 @@ func TestCloneDir(t *testing.T) {
 		t.Errorf("no such file or directory: %s", BaseDir)
 		return
 	}
+
+	cleanup()
+}
+
+func TestBackgroundCheck(t *testing.T) {
+	initialize()
+
+	feedDir("copy", 1)("data")
+
+	if !backgroundCheck(filepath.Join(BaseDir, "copy", "file0")) {
+		t.Errorf("Background check should be ok")
+	}
+
+	copyDir()
+
+	if backgroundCheck(filepath.Join(BaseDir, "copy", "file0")) {
+		t.Errorf("Background check should be ko")
+	}
+
+	feedDir("copy", 1)("data\n newdata")
+
+	if !backgroundCheck(filepath.Join(BaseDir, "copy", "file0")) {
+		t.Errorf("Background check should be ok")
+	}
+
+	cleanup()
 }
 
 func TestBackupFile(t *testing.T) {
+	initialize()
+
 	file := "fileToBackup"
 
 	err := ioutil.WriteFile(filepath.Join(RootDir, file), []byte("some old config"), 0777)
 	if err != nil {
+		fmt.Print("coucou")
 		log.Fatal(err)
 	}
 
-	backup(file)
+	backupIfExist(file)
 
 	if _, err := os.Stat(filepath.Join(BaseDir, "backup", file)); os.IsNotExist(err) {
 		t.Errorf("Failed to backup %s", filepath.Join(RootDir, file))
 	}
+
+	cleanup()
 }
 
 func TestCopy(t *testing.T) {
-
 	initialize()
 
 	feedDir("copy", 5)("data")
@@ -100,10 +139,11 @@ func TestCopy(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		isPresent(t, RootDir, mockFileName(i))
 	}
+
+	cleanup()
 }
 
 func TestLink(t *testing.T) {
-
 	initialize()
 
 	feedLink := feedDir("link", 5)
@@ -125,11 +165,28 @@ func TestLink(t *testing.T) {
 
 	feedLink("new data")
 
-	err = checkRoot("new data")
+	err = checkRoot("data")
 	if err != nil {
 		t.Errorf("Linked files should have been updated\n%v", err)
 	}
 
+	cleanup()
+}
+
+func TestFirstInit(t *testing.T) {
+	initialize()
+
+	if !firstInit() {
+		t.Errorf("It should be the first init")
+	}
+
+	setupCache()
+
+	if firstInit() {
+		t.Errorf("It should not be the first init")
+	}
+
+	cleanup()
 }
 
 func TestInit(t *testing.T) {
@@ -144,7 +201,7 @@ foo
 
 	out := initDir()
 	if bytes.Compare(out, []byte(expected)) != 0 {
-		t.Errorf("%s\n was expected but found\n%s", string(out), expected)
+		t.Errorf("%s\n was expected but found\n%s", expected, string(out))
 	}
 }
 
@@ -188,7 +245,7 @@ func checkDir(base string, count int) func(string) error {
 			}
 
 			if string(bytes) != content {
-				return errors.New("expected \"" + string(bytes) + "\" but found \"" + content + "\" in " + path)
+				return errors.New("expected \"" + content + "\" but found \"" + string(bytes) + "\" in " + path)
 			}
 		}
 		return nil
