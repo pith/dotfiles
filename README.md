@@ -1,7 +1,7 @@
-dotfiles [![Build Status](https://travis-ci.org/pith/dotfiles.svg)](https://travis-ci.org/pith/dotfiles)
+dotfiles [![Build Status](https://travis-ci.org/pith/dotfiles.svg)](https://travis-ci.org/pith/dotfiles) [![Coverage Status](https://coveralls.io/repos/pith/dotfiles/badge.svg?branch=master)](https://coveralls.io/r/pith/dotfiles?branch=master)
 ========
 
-Managing your dotfiles around multiple machine can be a pain. That's why a lot of initiatives came up to fix this. Most of them are listed in the [Your unofficial guide to dotfiles on GitHub](https://dotfiles.github.io/). But what I miss in these projects is a portable (I mean, whithout requiring any dependency) dotfiles manager separated from the dotfiles config. I want it to be platform and shell independent. And I want to be able to pull updates from this manager whitout pulling someone else config.
+Managing your dotfiles around multiple machine can be a pain. That's why a lot of initiatives came up to fix this. Most of them are listed in the [unofficial guide to dotfiles on GitHub](https://dotfiles.github.io/). But what I miss in these projects is a portable (I mean, whithout requiring any dependency) dotfiles manager separated from the dotfiles config. I want it to be platform and shell independent. And I want to be able to pull updates from this manager whitout pulling someone else config.
 
 That's why I started this project based on the great work of [cowboy](https://github.com/cowboy/dotfiles). The goal here is to have a single dotfiles binary written in Go, doing all the dotfiles managing stuff for you.
 
