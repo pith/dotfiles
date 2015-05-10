@@ -20,6 +20,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"strconv"
 )
 
 var (
@@ -29,12 +30,20 @@ var (
 
 var help = `usage: dotfiles [command]
 
-The commands are:
-  create    Create a new .dotfiles directory
-  get [url] Clone the git repo at the given URL     
-  init      Initialize your config difine in the .dotfiles dir
-`
+Command list
 
+Setup your machine:
+  get [url] Clone a dotfiles project at the given Git URL     
+  add      Add a file to one of the dotfiles directories
+  run      Initialize your config based on ~/.dotfiles
+
+Additional commands:
+  init     Run the init scripts
+  copy     Copy the files in ~/.dotfiles/copy to ~/
+  link     Link the files in ~/.dotfiles/link to ~/
+
+`
+// Default paths
 var (
 	// RootDir is the directory where files will be link or copy.
 	RootDir = "."
@@ -46,6 +55,11 @@ var (
 	BaseDir = filepath.Join(RootDir, DotFilesDir)
 
 	dirs = [8]string{"bin", "conf", "copy", "init", "link", "source", "test", "vendor"}
+)
+
+// flags
+var (
+	noCache = flag.Bool("nocache", false, "The script will be run like the first time.")	
 )
 
 func changeRootDir(path string) {
@@ -65,11 +79,14 @@ func main() {
 
 	changeRootDir(usr.HomeDir)
 
-	if command == "create" {
+	printHeader("    .: Dotfiles :.")
+
+	switch command {
+	case "create":
 		initialize()
-	} else if command == "get" {
+	case "get":
 		cloneRepo(flag.Arg(1))
-	} else if command == "init" {
+	case "run":
 		printHeader("Copying files into home directory")
 		copyDir()
 
@@ -79,17 +96,46 @@ func main() {
 		printHeader("Run the following init scripts")
 		initDir()
 
-		//sourceDir()
-
 		printHeader("All done !")
-	} else {
+	case "add":
+		addCmd(flag.Arg(1), flag.Arg(2))
+	case "init":
+		initDir()
+	case "copy":
+		copyDir()
+	case "link":
+		linkDir()
+	default:
 		fmt.Print(help)
+	}
+}
+
+func addCmd(cmd, file string) {
+	switch cmd {
+	case "bin":
+		cpToDot("bin", file)
+	case "conf":
+		cpToDot("conf", file)
+	case "copy":
+		cpToDot("copy", file)
+	case "init":
+		cpToDot("init", file)
+	case "link":
+		cpToDot("link", file)
+	case "source":
+		cpToDot("source", file)
+	case "test":
+		cpToDot("test", file)
+	case "vendor":
+		cpToDot("vendor", file)
+	default:
+		fmt.Printf("Unknown dotfiles directory: %s\n", cmd)
 	}
 }
 
 func printHeader(s string) {
 	if !quietMode {
-		fmt.Printf("\033[1m%s\033[0m\n", s)
+		fmt.Printf("\n\033[1m%s\033[0m\n", s)
 	}
 }
 
@@ -97,20 +143,6 @@ func printArrow(s string) {
 	if !quietMode {
 		fmt.Printf(" \033[1;34m➜\033[0m  %s\n", s)
 	}
-}
-
-// Initialize creates a new .dotfiles repo
-func initialize() {
-	printHeader("Scaffold " + BaseDir)
-
-	for _, dir := range dirs {
-		printArrow(dir)
-		os.MkdirAll(filepath.Join(BaseDir, dir), 0777)
-	}
-	if !quietMode {
-		fmt.Println("")
-	}
-	printHeader("All done !")
 }
 
 // CloneRepo clones the given git repository
@@ -121,7 +153,7 @@ func cloneRepo(gitrepo string) {
 		fmt.Errorf("git is required to clone the dotfiles repo")
 	}
 
-	err = exec.Command(git, "clone", gitrepo, BaseDir).Run()
+	err = exec.Command(git, "clone", "--recursive", gitrepo, BaseDir).Run()
 	if err != nil {
 		fmt.Errorf("Failed to clone %s", gitrepo)
 	}
@@ -182,11 +214,13 @@ func backupIfExist(file string) {
 		os.Mkdir(filepath.Join(BaseDir, "backup"), 0777)
 	}
 
-	if _, err := os.Stat(filepath.Join(RootDir, file)); !os.IsNotExist(err) {
+	path := filepath.Join(RootDir, file)
+	backupPath := filepath.Join(BaseDir, "backup", file)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		// The file already exists so backup it
-		printHeader("Backup %s")
+		printHeader(fmt.Sprintf("Backup %s -> %s", path, backupPath))
 
-		err = exec.Command("mv", filepath.Join(RootDir, file), filepath.Join(BaseDir, "backup", file)).Run()
+		err = exec.Command("mv", path, backupPath).Run()
 		if err != nil {
 			fmt.Errorf("Failed to backup %s\n%v", file, err)
 		}
@@ -201,6 +235,7 @@ func copyDir() {
 		}
 
 		if backgroundCheck(fileToCopy) {
+			printArrow(fileToCopy)
 			return exec.Command("cp", fileToCopy, RootDir).Run()
 		}
 		return nil
@@ -215,6 +250,7 @@ func linkDir() {
 		}
 
 		if backgroundCheck(file) {
+			printArrow(file)
 			return exec.Command("ln", "-sf", file, RootDir).Run()
 		}
 		return nil
@@ -222,6 +258,10 @@ func linkDir() {
 }
 
 func firstInit() bool {
+	if *noCache { 
+		return true
+	}
+	
 	if _, err := os.Stat(filepath.Join(BaseDir, "cache")); os.IsNotExist(err) {
 		return true
 	}
@@ -229,33 +269,56 @@ func firstInit() bool {
 }
 
 func setupCache() {
-	err := os.Mkdir(filepath.Join(BaseDir, "cache"), 0777)
-	if err != nil {
-		log.Fatal(err)
+	if _, err := os.Stat(filepath.Join(BaseDir, "cache")); os.IsNotExist(err) {
+		err := os.Mkdir(filepath.Join(BaseDir, "cache"), 0777)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
 // InitDir executes all the scripts in the init dir
 func initDir() []byte {
-	var out []byte
+
+	i := 1
+	applyCmd("init", func(initFile string) error {
+		printArrow(strconv.Itoa(i) + ". " + initFile)
+		return nil
+	})
 
 	// TODO add the possibility to run them again based on user input
+	var out []byte
 	if firstInit() {
-		applyCmd("init", func(initFile string) error {
-			printHeader("Run " + initFile)
-
-			output, err := exec.Command("/bin/bash", initFile).CombinedOutput()
-			out = append(out, output...)
-			return err
-		})
-
-		if !quietMode && len(out) != 0 {
-			fmt.Printf("%s", string(out))
-		}
+		out = doInitDir()
 
 		// Add cache to skip the init phase in next runs
 		setupCache()
+	} else {
+		fmt.Printf("\nRerun init scripts (Y/n): ")
+		var input string
+		fmt.Scan(&input)
+		if input == "Y" || input == "y" {
+			doInitDir()
+		}
 	}
+	return out
+}
+
+func doInitDir() []byte {
+	var out []byte
+
+	applyCmd("init", func(initFile string) error {
+		printHeader("Run " + initFile)
+
+		output, err := exec.Command("/bin/bash", "-c", "source "+initFile).CombinedOutput()
+		out = append(out, output...)
+		return err
+	})
+
+	if !quietMode && len(out) != 0 {
+		fmt.Printf("%s", string(out))
+	}
+
 	return out
 }
 
