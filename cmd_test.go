@@ -32,17 +32,15 @@ func TestMain(m *testing.M) {
 	RootDir = filepath.Join(tmpDir, "root")
 	os.Mkdir(RootDir, 0777)
 	changeRootDir(RootDir)
+	cachePath = filepath.Join(BaseDir, "cache", "cache.json")
 
 	if debugMode {
 		fmt.Printf("BaseDir: %s\n", BaseDir)
 	}
 	res := m.Run()
 
-	err = os.RemoveAll(RootDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	cleanup()
+	fmt.Println(BaseDir)
 	os.Exit(res)
 }
 
@@ -181,7 +179,7 @@ func TestFirstInit(t *testing.T) {
 		t.Errorf("It should be the first init")
 	}
 
-	setupCache()
+	loadCache()
 
 	if firstInit() {
 		t.Errorf("It should not be the first init")

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"os/exec"
-	"log"
-	"path/filepath"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 )
 
 // Initialize creates a new .dotfiles repo
