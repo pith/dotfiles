@@ -19,8 +19,8 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -43,6 +43,7 @@ Additional commands:
   link     Link the files in ~/.dotfiles/link to ~/
 
 `
+
 // Default paths
 var (
 	// RootDir is the directory where files will be link or copy.
@@ -59,7 +60,7 @@ var (
 
 // flags
 var (
-	noCache = flag.Bool("nocache", false, "The script will be run like the first time.")	
+	noCache = flag.Bool("nocache", false, "The script will be run like the first time.")
 )
 
 func changeRootDir(path string) {
@@ -230,12 +231,17 @@ func backupIfExist(file string) {
 // CopyDir copies all the files in the copy dir at ~/
 func copyDir() {
 	applyCmd("copy", func(fileToCopy string) error {
-		if firstInit() {
+		contains, err := cacheContains(copy, fileToCopy)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if contains {
 			backupIfExist(fileToCopy)
 		}
 
 		if backgroundCheck(fileToCopy) {
 			printArrow(fileToCopy)
+			cacheAdd(copy, fileToCopy)
 			return exec.Command("cp", fileToCopy, RootDir).Run()
 		}
 		return nil
@@ -245,12 +251,17 @@ func copyDir() {
 // LinkDir links all the files in the link dir at ~/
 func linkDir() {
 	applyCmd("link", func(file string) error {
-		if firstInit() {
+		contains, err := cacheContains(link, file)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if contains {
 			backupIfExist(file)
 		}
 
 		if backgroundCheck(file) {
 			printArrow(file)
+			cacheAdd(link, file)
 			return exec.Command("ln", "-sf", file, RootDir).Run()
 		}
 		return nil
@@ -258,23 +269,14 @@ func linkDir() {
 }
 
 func firstInit() bool {
-	if *noCache { 
+	if *noCache {
 		return true
 	}
-	
+
 	if _, err := os.Stat(filepath.Join(BaseDir, "cache")); os.IsNotExist(err) {
 		return true
 	}
 	return false
-}
-
-func setupCache() {
-	if _, err := os.Stat(filepath.Join(BaseDir, "cache")); os.IsNotExist(err) {
-		err := os.Mkdir(filepath.Join(BaseDir, "cache"), 0777)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 }
 
 // InitDir executes all the scripts in the init dir
@@ -291,8 +293,6 @@ func initDir() []byte {
 	if firstInit() {
 		out = doInitDir()
 
-		// Add cache to skip the init phase in next runs
-		setupCache()
 	} else {
 		fmt.Printf("\nRerun init scripts (Y/n): ")
 		var input string
@@ -312,6 +312,9 @@ func doInitDir() []byte {
 
 		output, err := exec.Command("/bin/bash", "-c", "source "+initFile).CombinedOutput()
 		out = append(out, output...)
+		if err != nil {
+			cacheAdd(initRun, initFile)
+		}
 		return err
 	})
 
