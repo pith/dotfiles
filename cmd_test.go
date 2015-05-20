@@ -148,23 +148,18 @@ func TestLink(t *testing.T) {
 	feedLink := feedDir("link", 5)
 	feedLink("data")
 
-	err := checkDir("link", 5)("data")
-	if err != nil {
-		t.Errorf("Failed to init the copy dir, %v", err)
-	}
-
 	linkDir()
 
 	checkRoot := checkDir("../", 5)
 
-	err = checkRoot("data")
+	err := checkRoot("data")
 	if err != nil {
 		t.Errorf("Failed to link the files in %s\n%v", RootDir, err)
 	}
 
 	feedLink("new data")
 
-	err = checkRoot("data")
+	err = checkRoot("new data")
 	if err != nil {
 		t.Errorf("Linked files should have been updated\n%v", err)
 	}

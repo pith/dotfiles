@@ -78,6 +78,8 @@ func main() {
 		fmt.Errorf("%v", err)
 	}
 
+	loadCache()
+
 	changeRootDir(usr.HomeDir)
 
 	printHeader("    .: Dotfiles :.")
@@ -88,10 +90,8 @@ func main() {
 	case "get":
 		cloneRepo(flag.Arg(1))
 	case "run":
-		printHeader("Copying files into home directory")
 		copyDir()
 
-		printHeader("Linking files into home directory")
 		linkDir()
 
 		printHeader("Run the following init scripts")
@@ -209,36 +209,65 @@ func backgroundCheck(file string) bool {
 
 }
 
-func backupIfExist(file string) {
+// BackupFiles backs up files which will be copyied or linked,
+// but which don't appear in the cache
+func backupFiles(dirName string, action Action) {
+	firstBackup := true
+
+	applyCmd(dirName, func(fileToCopy string) error {
+		contains, err := cacheContains(action, fileToCopy)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !contains {
+			path, backupPath := backupIfExist(fileToCopy)
+			if path != "" && backupPath != "" {
+				if firstBackup {
+					printHeader("Backup before " + dirName + "ing")
+					firstBackup = false
+				}
+				fmt.Printf(" %s ➜ %s\n", path, backupPath)
+			}
+		}
+
+		return nil
+	})
+
+}
+
+// BackupIfExist move a file in the backup dir if it exists
+func backupIfExist(file string) (string, string){
+	file = filepath.Base(file)
+
 	// If there is no backup dir yet create it
 	if _, err := os.Stat(filepath.Join(BaseDir, "backup")); os.IsNotExist(err) {
-		os.Mkdir(filepath.Join(BaseDir, "backup"), 0777)
+		err = os.Mkdir(filepath.Join(BaseDir, "backup"), 0777)
+		if err != nil {
+			log.Fatal("Failed to create backup dir: ", err)
+		}
 	}
 
 	path := filepath.Join(RootDir, file)
-	backupPath := filepath.Join(BaseDir, "backup", file)
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		// The file already exists so backup it
-		printHeader(fmt.Sprintf("Backup %s -> %s", path, backupPath))
 
+	backupPath := filepath.Join(BaseDir, "backup", file)
+	if _, err := os.Stat(path); err == nil {
+		// The file already exists so backup it
 		err = exec.Command("mv", path, backupPath).Run()
 		if err != nil {
 			fmt.Errorf("Failed to backup %s\n%v", file, err)
 		}
+		return path, backupPath
 	}
+	return "", ""
 }
 
 // CopyDir copies all the files in the copy dir at ~/
 func copyDir() {
-	applyCmd("copy", func(fileToCopy string) error {
-		contains, err := cacheContains(copy, fileToCopy)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if contains {
-			backupIfExist(fileToCopy)
-		}
+	backupFiles("copy", copy)
+	
+	printHeader("Copying files into home directory")
 
+	applyCmd("copy", func(fileToCopy string) error {
 		if backgroundCheck(fileToCopy) {
 			printArrow(fileToCopy)
 			cacheAdd(copy, fileToCopy)
@@ -250,15 +279,11 @@ func copyDir() {
 
 // LinkDir links all the files in the link dir at ~/
 func linkDir() {
-	applyCmd("link", func(file string) error {
-		contains, err := cacheContains(link, file)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if contains {
-			backupIfExist(file)
-		}
+	backupFiles("link", link)
+	
+	printHeader("Linking files into home directory")
 
+	applyCmd("link", func(file string) error {
 		if backgroundCheck(file) {
 			printArrow(file)
 			cacheAdd(link, file)
