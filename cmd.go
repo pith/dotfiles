@@ -146,6 +146,20 @@ func printArrow(s string) {
 	}
 }
 
+func printOK(s string) {
+	if !quietMode {
+		fmt.Printf(" \033[1;32m✔\033[0m  %s\n", s)
+	}
+}
+
+func printKO(s string) {
+	if !quietMode {
+		fmt.Printf(" \033[1;32m✖\033[0m  %s\n", s)
+	}
+}
+
+
+
 // CloneRepo clones the given git repository
 func cloneRepo(gitrepo string) {
 	printHeader("Clone " + gitrepo)
@@ -309,9 +323,26 @@ func initDir() []byte {
 
 	i := 1
 	applyCmd("init", func(initFile string) error {
-		printArrow(strconv.Itoa(i) + ". " + initFile)
+		contains, err := cacheContains(initRun, initFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !contains {
+			printOK(strconv.Itoa(i) + ". " + initFile)
+		} else {
+			printKO(strconv.Itoa(i) + ". " + initFile)
+		}
 		return nil
 	})
+
+	fmt.Printf("\nEdit scripts to run ? (Y/n): ")
+	var input string
+	fmt.Scan(&input)
+	if input == "Y" || input == "y" {
+		fmt.Printf("\nEnter the script ids that you want to toggle: ")
+		var scripts []int
+		fmt.Scan(&scripts)
+	}
 
 	// TODO add the possibility to run them again based on user input
 	var out []byte
