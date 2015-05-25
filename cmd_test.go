@@ -9,7 +9,6 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -19,6 +18,8 @@ import (
 	"strconv"
 	"testing"
 )
+
+var tmpDir string
 
 // Setup a temporary dir where the tests are run and cleanup at the end
 func TestMain(m *testing.M) {
@@ -45,10 +46,13 @@ func TestMain(m *testing.M) {
 }
 
 func cleanup() {
-	err := os.RemoveAll(BaseDir)
+	err := os.RemoveAll(RootDir)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	RootDir = filepath.Join(tmpDir, "root")
+	os.Mkdir(RootDir, 0777)
 }
 
 func TestInitDotfilesDir(t *testing.T) {
@@ -92,7 +96,11 @@ func TestBackgroundCheck(t *testing.T) {
 		t.Errorf("Background check should be ok")
 	}
 
-	copyDir()
+	var dots Dotfiles
+
+	dots.read()
+
+	dots.cp()
 
 	if backgroundCheck(filepath.Join(BaseDir, "copy", "file0")) {
 		t.Errorf("Background check should be ko")
@@ -127,89 +135,17 @@ func TestBackupFile(t *testing.T) {
 	cleanup()
 }
 
-func TestCopy(t *testing.T) {
-	initialize()
+// func TestSource(t *testing.T) {
+// 	initialize()
 
-	feedDir("copy", 5)("data")
+// 	feedDir("source", 1)("echo plop; export FOO=\"youpi !!\"; env")
 
-	copyDir()
+// 	sourceDir()
 
-	// Check if all the copied files are present
-	for i := 0; i < 5; i++ {
-		isPresent(t, RootDir, mockFileName(i))
-	}
-
-	cleanup()
-}
-
-func TestLink(t *testing.T) {
-	initialize()
-
-	feedLink := feedDir("link", 5)
-	feedLink("data")
-
-	linkDir()
-
-	checkRoot := checkDir("../", 5)
-
-	err := checkRoot("data")
-	if err != nil {
-		t.Errorf("Failed to link the files in %s\n%v", RootDir, err)
-	}
-
-	feedLink("new data")
-
-	err = checkRoot("new data")
-	if err != nil {
-		t.Errorf("Linked files should have been updated\n%v", err)
-	}
-
-	cleanup()
-}
-
-func TestFirstInit(t *testing.T) {
-	initialize()
-
-	if !firstInit() {
-		t.Errorf("It should be the first init")
-	}
-
-	loadCache()
-
-	if firstInit() {
-		t.Errorf("It should not be the first init")
-	}
-
-	cleanup()
-}
-
-func TestInit(t *testing.T) {
-	initialize()
-
-	feedDir("init", 3)("echo foo")
-
-	expected := `foo
-foo
-foo
-`
-
-	out := initDir()
-	if bytes.Compare(out, []byte(expected)) != 0 {
-		t.Errorf("%s\n was expected but found\n%s", expected, string(out))
-	}
-}
-
-func TestSource(t *testing.T) {
-	initialize()
-
-	feedDir("source", 1)("echo plop; export FOO=\"youpi !!\"; env")
-
-	sourceDir()
-
-	if os.Getenv("FOO") != "youpi !!" {
-		t.Errorf("Failed to source files. Expected \"FOO=youpi !!\", but found \"%s\"", os.Getenv("FOO"))
-	}
-}
+// 	if os.Getenv("FOO") != "youpi !!" {
+// 		t.Errorf("Failed to source files. Expected \"FOO=youpi !!\", but found \"%s\"", os.Getenv("FOO"))
+// 	}
+// }
 
 // ====== Utils ======
 

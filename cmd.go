@@ -13,14 +13,11 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
-	"strconv"
-	"strings"
 )
 
 var (
@@ -82,7 +79,10 @@ func main() {
 
 	changeRootDir(usr.HomeDir)
 
-	printHeader("    .: Dotfiles :.")
+	var dots Dotfiles
+	dots.read()
+
+	console.printHeader("    .: Dotfiles :.")
 
 	switch command {
 	case "create":
@@ -90,22 +90,22 @@ func main() {
 	case "get":
 		cloneRepo(flag.Arg(1))
 	case "run":
-		copyDir()
+		dots.cp()
 
-		linkDir()
+		dots.ln()
 
-		printHeader("Run the following init scripts")
-		initDir()
+		console.printHeader("Run the following init scripts")
+		dots.init()
 
-		printHeader("All done !")
+		console.printHeader("All done !")
 	case "add":
 		addCmd(flag.Arg(1), flag.Arg(2))
 	case "init":
-		initDir()
+		dots.init()
 	case "copy":
-		copyDir()
+		dots.cp()
 	case "link":
-		linkDir()
+		dots.ln()
 	default:
 		fmt.Print(help)
 	}
@@ -134,21 +134,9 @@ func addCmd(cmd, file string) {
 	}
 }
 
-func printHeader(s string) {
-	if !quietMode {
-		fmt.Printf("\n\033[1m%s\033[0m\n", s)
-	}
-}
-
-func printArrow(s string) {
-	if !quietMode {
-		fmt.Printf(" \033[1;34m➜\033[0m  %s\n", s)
-	}
-}
-
 // CloneRepo clones the given git repository
 func cloneRepo(gitrepo string) {
-	printHeader("Clone " + gitrepo)
+	console.printHeader("Clone " + gitrepo)
 	git, err := exec.LookPath("git")
 	if err != nil {
 		fmt.Errorf("git is required to clone the dotfiles repo")
@@ -159,7 +147,7 @@ func cloneRepo(gitrepo string) {
 		fmt.Errorf("Failed to clone %s", gitrepo)
 	}
 
-	printHeader(BaseDir + " is ready !")
+	console.printHeader(BaseDir + " is ready !")
 }
 
 // BackgroundCheck verifies if there are some actions to do on the given file
@@ -209,34 +197,8 @@ func backgroundCheck(file string) bool {
 
 }
 
-// BackupFiles backs up files which will be copyied or linked,
-// but which don't appear in the cache
-func backupFiles(dirName string, action Action) {
-	firstBackup := true
-
-	applyCmd(dirName, func(fileToCopy string) error {
-		contains, err := cacheContains(action, fileToCopy)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if !contains {
-			path, backupPath := backupIfExist(fileToCopy)
-			if path != "" && backupPath != "" {
-				if firstBackup {
-					printHeader("Backup before " + dirName + "ing")
-					firstBackup = false
-				}
-				fmt.Printf(" %s ➜ %s\n", path, backupPath)
-			}
-		}
-
-		return nil
-	})
-
-}
-
 // BackupIfExist move a file in the backup dir if it exists
-func backupIfExist(file string) (string, string){
+func backupIfExist(file string) (string, string) {
 	file = filepath.Base(file)
 
 	// If there is no backup dir yet create it
@@ -261,136 +223,32 @@ func backupIfExist(file string) (string, string){
 	return "", ""
 }
 
-// CopyDir copies all the files in the copy dir at ~/
-func copyDir() {
-	backupFiles("copy", copy)
-	
-	printHeader("Copying files into home directory")
-
-	applyCmd("copy", func(fileToCopy string) error {
-		if backgroundCheck(fileToCopy) {
-			printArrow(fileToCopy)
-			cacheAdd(copy, fileToCopy)
-			return exec.Command("cp", fileToCopy, RootDir).Run()
-		}
-		return nil
-	})
-}
-
-// LinkDir links all the files in the link dir at ~/
-func linkDir() {
-	backupFiles("link", link)
-	
-	printHeader("Linking files into home directory")
-
-	applyCmd("link", func(file string) error {
-		if backgroundCheck(file) {
-			printArrow(file)
-			cacheAdd(link, file)
-			return exec.Command("ln", "-sf", file, RootDir).Run()
-		}
-		return nil
-	})
-}
-
-func firstInit() bool {
-	if *noCache {
-		return true
-	}
-
-	if _, err := os.Stat(filepath.Join(BaseDir, "cache")); os.IsNotExist(err) {
-		return true
-	}
-	return false
-}
-
-// InitDir executes all the scripts in the init dir
-func initDir() []byte {
-
-	i := 1
-	applyCmd("init", func(initFile string) error {
-		printArrow(strconv.Itoa(i) + ". " + initFile)
-		return nil
-	})
-
-	// TODO add the possibility to run them again based on user input
-	var out []byte
-	if firstInit() {
-		out = doInitDir()
-
-	} else {
-		fmt.Printf("\nRerun init scripts (Y/n): ")
-		var input string
-		fmt.Scan(&input)
-		if input == "Y" || input == "y" {
-			doInitDir()
-		}
-	}
-	return out
-}
-
-func doInitDir() []byte {
-	var out []byte
-
-	applyCmd("init", func(initFile string) error {
-		printHeader("Run " + initFile)
-
-		output, err := exec.Command("/bin/bash", "-c", "source "+initFile).CombinedOutput()
-		out = append(out, output...)
-		if err != nil {
-			cacheAdd(initRun, initFile)
-		}
-		return err
-	})
-
-	if !quietMode && len(out) != 0 {
-		fmt.Printf("%s", string(out))
-	}
-
-	return out
-}
-
 // SourceDir source all the files in the source dir
 // Solution from here: http://stackoverflow.com/a/29995987/1292605
-func sourceDir() {
-	applyCmd("source", func(file string) error {
-		printHeader("Sourcing " + file)
 
-		cmd := exec.Command("/bin/bash", "-c", "source "+file+" ; echo '<<<ENVIRONMENT>>>' ; env")
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return err
-		}
+// func sourceDir() {
+// 	applyCmd("source", func(file string) error {
+// 		printHeader("Sourcing " + file)
 
-		s := bufio.NewScanner(bytes.NewReader(out))
-		start := false
-		for s.Scan() {
-			if s.Text() == "<<<ENVIRONMENT>>>" {
-				start = true
-			} else if start {
-				kv := strings.SplitN(s.Text(), "=", 2)
-				if len(kv) == 2 {
-					os.Setenv(kv[0], kv[1])
-				}
-			}
-		}
+// 		cmd := exec.Command("/bin/bash", "-c", "source "+file+" ; echo '<<<ENVIRONMENT>>>' ; env")
+// 		out, err := cmd.CombinedOutput()
+// 		if err != nil {
+// 			return err
+// 		}
 
-		return nil
-	})
-}
+// 		s := bufio.NewScanner(bytes.NewReader(out))
+// 		start := false
+// 		for s.Scan() {
+// 			if s.Text() == "<<<ENVIRONMENT>>>" {
+// 				start = true
+// 			} else if start {
+// 				kv := strings.SplitN(s.Text(), "=", 2)
+// 				if len(kv) == 2 {
+// 					os.Setenv(kv[0], kv[1])
+// 				}
+// 			}
+// 		}
 
-func applyCmd(dir string, execCmd func(string) error) {
-	dirPath := filepath.Join(BaseDir, dir)
-
-	files, readErr := ioutil.ReadDir(dirPath)
-	if readErr != nil {
-		fmt.Errorf("Failed to read %s dir at %s", dir, dirPath)
-	}
-
-	for _, file := range files {
-		err := execCmd(filepath.Join(dirPath, file.Name()))
-		if err != nil {
-			fmt.Errorf("Failed to %s file: %s", dir, file.Name())
-		}
-	}
-}
+// 		return nil
+// 	})
+// }

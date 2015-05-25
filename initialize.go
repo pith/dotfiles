@@ -10,16 +10,16 @@ import (
 
 // Initialize creates a new .dotfiles repo
 func initialize() {
-	printHeader("Scaffold " + BaseDir)
+	console.printHeader("Scaffold " + BaseDir)
 
 	for _, dir := range dirs {
-		printArrow(dir)
+		console.printArrow(dir)
 		os.MkdirAll(filepath.Join(BaseDir, dir), 0777)
 	}
 	if !quietMode {
 		fmt.Println("")
 	}
-	printHeader("All done !")
+	console.printHeader("All done !")
 }
 
 func cpToDot(cmd, path string) {
