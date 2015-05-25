@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // Console prints string to the console
@@ -30,39 +35,58 @@ func (c Console) printKO(s string) {
 	c.print(fmt.Sprintf(" \033[1;32m✖\033[0m  %s\n", s))
 }
 
-func (c Console) printMenu(scripts map[string]bool) {
-	i := 1
-	for name, ok := range scripts {
-		if ok {
-			c.printOK(strconv.Itoa(i) + ". " + name)
+func (c Console) printMenu(scripts []string, shouldBeRun map[string]bool) {
+	console.printHeader("Run the following init scripts")
+
+	for i, script := range scripts {
+		if shouldBeRun[script] {
+			c.printOK(strconv.Itoa(i) + ". " + filepath.Base(script))
 		} else {
-			c.printKO(strconv.Itoa(i) + ". " + name)
+			c.printKO(strconv.Itoa(i) + ". " + filepath.Base(script))
 		}
-		i++
 	}
 }
 
-func (c Console) editMenu(scripts map[string]bool) map[string]bool {
+func (c Console) editMenu(scripts []string, shouldBeRun map[string]bool) map[string]bool {
 	fmt.Printf("\nEdit scripts to run ? (Y/n): ")
 	var input string
 	fmt.Scan(&input)
 
-	var toggled []int
+	var toggled []string
 	if input == "Y" || input == "y" {
+		reader := bufio.NewReader(os.Stdin)
+
 		fmt.Printf("\nEnter the script ids that you want to toggle: ")
-		fmt.Scan(&toggled)
+
+		text, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		text = strings.TrimSuffix(text, "\n")
+
+		// check if ',' is used as separator
+		if strings.Contains(text, ",") {
+			toggled = strings.Split(text, ",")
+		} else {
+			toggled = strings.Split(text, " ")
+		}
 	} else {
 		return nil
 	}
 
 	for _, script := range toggled {
-		i := 1
-		for name, ok := range scripts {
-			if i == script {
-				scripts[name] = !ok
-			}
-			i++
+		id, err := strconv.Atoi(script)
+		if err != nil {
+			fmt.Printf("Expected script ids but found %s\n: %s", script, err)
 		}
+
+		for i, f := range scripts {
+			if i == id {
+				shouldBeRun[f] = !shouldBeRun[f]
+			}
+		}
+
 	}
-	return scripts
+	return shouldBeRun
 }

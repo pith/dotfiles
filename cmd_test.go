@@ -33,26 +33,34 @@ func TestMain(m *testing.M) {
 	RootDir = filepath.Join(tmpDir, "root")
 	os.Mkdir(RootDir, 0777)
 	changeRootDir(RootDir)
+
 	cachePath = filepath.Join(BaseDir, "cache", "cache.json")
 
 	if debugMode {
 		fmt.Printf("BaseDir: %s\n", BaseDir)
 	}
+
 	res := m.Run()
 
 	cleanup()
-	fmt.Println(BaseDir)
+
 	os.Exit(res)
 }
 
 func cleanup() {
-	err := os.RemoveAll(RootDir)
+	err := os.RemoveAll(filepath.Join(tmpDir, "root"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	tmpDir, err := ioutil.TempDir("", "go-test")
+	if err != nil {
+		fmt.Errorf("Failed to create tmp dir: %v", err)
+	}
+
 	RootDir = filepath.Join(tmpDir, "root")
 	os.Mkdir(RootDir, 0777)
+	changeRootDir(RootDir)
 }
 
 func TestInitDotfilesDir(t *testing.T) {

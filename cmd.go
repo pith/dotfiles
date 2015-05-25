@@ -63,6 +63,7 @@ var (
 func changeRootDir(path string) {
 	RootDir = path
 	BaseDir = filepath.Join(RootDir, DotFilesDir)
+	cachePath = filepath.Join(BaseDir, "cache", "cache.json")
 }
 
 func main() {
@@ -75,9 +76,9 @@ func main() {
 		fmt.Errorf("%v", err)
 	}
 
-	loadCache()
-
 	changeRootDir(usr.HomeDir)
+
+	loadCache()
 
 	var dots Dotfiles
 	dots.read()
@@ -94,43 +95,11 @@ func main() {
 
 		dots.ln()
 
-		console.printHeader("Run the following init scripts")
 		dots.init()
 
 		console.printHeader("All done !")
-	case "add":
-		addCmd(flag.Arg(1), flag.Arg(2))
-	case "init":
-		dots.init()
-	case "copy":
-		dots.cp()
-	case "link":
-		dots.ln()
 	default:
 		fmt.Print(help)
-	}
-}
-
-func addCmd(cmd, file string) {
-	switch cmd {
-	case "bin":
-		cpToDot("bin", file)
-	case "conf":
-		cpToDot("conf", file)
-	case "copy":
-		cpToDot("copy", file)
-	case "init":
-		cpToDot("init", file)
-	case "link":
-		cpToDot("link", file)
-	case "source":
-		cpToDot("source", file)
-	case "test":
-		cpToDot("test", file)
-	case "vendor":
-		cpToDot("vendor", file)
-	default:
-		fmt.Printf("Unknown dotfiles directory: %s\n", cmd)
 	}
 }
 

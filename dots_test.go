@@ -50,21 +50,12 @@ func TestBackup(t *testing.T) {
 	}
 
 	var dots Dotfiles
-	invalideCache()
 
 	dots.read()
 
-	files, err := ioutil.ReadDir(RootDir)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(files) != 2 {
-		t.Errorf("2 files should have been backed up, but found %v", len(files))
-	}
-
 	dots.backup(ln, link)
 
-	files, err = ioutil.ReadDir(filepath.Join(BaseDir, "backup"))
+	files, err := ioutil.ReadDir(filepath.Join(BaseDir, "backup"))
 	if err != nil {
 		t.Error(err)
 	}

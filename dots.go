@@ -79,6 +79,7 @@ func (dots Dotfiles) backup(dir Dir, action Action) {
 					console.printHeader("Backup before " + dir.String() + "ing")
 					firstBackup = false
 				}
+
 				relPath, err := filepath.Rel(RootDir, backupPath)
 				if err != nil {
 					log.Fatal(err)
@@ -142,11 +143,12 @@ func (dots Dotfiles) init() []byte {
 		scripts[f] = !contains
 	}
 
-	console.printMenu(scripts)
+	console.printMenu(dots.Files[rn], scripts)
 
-	edited := console.editMenu(scripts)
+	edited := console.editMenu(dots.Files[rn], scripts)
 	if edited != nil {
-		console.printMenu(scripts)
+		scripts = edited
+		console.printMenu(dots.Files[rn], scripts)
 	}
 
 	var out []byte
@@ -155,11 +157,11 @@ func (dots Dotfiles) init() []byte {
 		if scripts[f] {
 			console.printHeader("Run " + filepath.Base(f))
 
-			// output, err := exec.Command("/bin/bash", "-c", "source "+f).CombinedOutput()
-			// out = append(out, output...)
-			// if err != nil {
-			// 	cacheAdd(initRun, f)
-			// }
+			output, err := exec.Command("/bin/bash", "-c", "source "+f).CombinedOutput()
+			out = append(out, output...)
+			if err != nil {
+				cacheAdd(initRun, f)
+			}
 		}
 	}
 
