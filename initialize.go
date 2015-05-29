@@ -19,6 +19,7 @@ func initialize() {
 	if !quietMode {
 		fmt.Println("")
 	}
+
 	console.printHeader("All done !")
 }
 

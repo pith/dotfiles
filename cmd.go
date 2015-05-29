@@ -69,38 +69,57 @@ func changeRootDir(path string) {
 func main() {
 	flag.Parse()
 
-	command := flag.Arg(0)
-
 	usr, err := user.Current()
 	if err != nil {
 		fmt.Errorf("%v", err)
 	}
-
 	changeRootDir(usr.HomeDir)
+
+	console.printHeader("    .: Dotfiles :.")
+	run()
+}
+
+func run() {
+	// Not initialize yet
+	_, err := os.Stat(BaseDir)
+	if err != nil && os.IsNotExist(err) {
+		fmt.Println("Your .dotfiles repository is setup yet.")
+		fmt.Println("Do you want to (C)lone a dot repo, Create a (N)ew one, See the (H)elp or (Q)uit ?")
+
+		var answer string
+		fmt.Scan(&answer)
+		switch answer {
+		case "c", "C":
+			fmt.Println("Enter a git URL:")
+			var answer string
+			fmt.Scan(&answer)
+			cloneRepo(answer)
+		case "n", "N":
+			initialize()
+			os.Exit(1)
+		case "h", "H", "?":
+			fmt.Println(help)
+			os.Exit(1)
+		case "q", "Q":
+			os.Exit(1)
+		default:
+			fmt.Println(help)
+			os.Exit(1)
+		}
+
+	}
+
+	// run the config
 
 	loadCache()
 
 	var dots Dotfiles
 	dots.read()
+	dots.cp()
+	dots.ln()
+	dots.init()
 
-	console.printHeader("    .: Dotfiles :.")
-
-	switch command {
-	case "create":
-		initialize()
-	case "get":
-		cloneRepo(flag.Arg(1))
-	case "run":
-		dots.cp()
-
-		dots.ln()
-
-		dots.init()
-
-		console.printHeader("All done !")
-	default:
-		fmt.Print(help)
-	}
+	console.printHeader("All done !")
 }
 
 // CloneRepo clones the given git repository
