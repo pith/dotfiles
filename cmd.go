@@ -127,12 +127,12 @@ func cloneRepo(gitrepo string) {
 	console.printHeader("Clone " + gitrepo)
 	git, err := exec.LookPath("git")
 	if err != nil {
-		fmt.Errorf("git is required to clone the dotfiles repo")
+		log.Fatal("git is required to clone the dotfiles repo")
 	}
 
 	err = exec.Command(git, "clone", "--recursive", gitrepo, BaseDir).Run()
 	if err != nil {
-		fmt.Errorf("Failed to clone %s", gitrepo)
+		log.Fatalf("Failed to clone %s: %s", gitrepo, err)
 	}
 
 	console.printHeader(BaseDir + " is ready !")
