@@ -83,14 +83,14 @@ func run() {
 	// Not initialize yet
 	_, err := os.Stat(BaseDir)
 	if err != nil && os.IsNotExist(err) {
-		fmt.Println("Your .dotfiles repository is setup yet.")
-		fmt.Println("Do you want to (C)lone a dot repo, Create a (N)ew one, See the (H)elp or (Q)uit ?")
+		console.printHeader("Your .dotfiles repository is not setup yet.")
+		fmt.Printf("\nDo you want to (C)lone a dot repo, Create a (N)ew one, See the (H)elp or (Q)uit ? ")
 
 		var answer string
 		fmt.Scan(&answer)
 		switch answer {
 		case "c", "C":
-			fmt.Println("Enter a git URL:")
+			fmt.Printf("\nEnter a git URL: ")
 			var answer string
 			fmt.Scan(&answer)
 			cloneRepo(answer)
