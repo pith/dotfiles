@@ -1,3 +1,11 @@
+// Copyright (c) 2015 by Pierre Thirouin. All rights reserved.
+
+// This file is part of dotfiles, a simple dotfiles manager.
+
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 package main
 
 import (
@@ -32,7 +40,7 @@ func (c Console) printOK(s string) {
 }
 
 func (c Console) printKO(s string) {
-	c.print(fmt.Sprintf(" \033[1;32m✖\033[0m  %s\n", s))
+	c.print(fmt.Sprintf(" \033[1;31m✖\033[0m  %s\n", s))
 }
 
 func (c Console) printMenu(scripts []string, shouldBeRun map[string]bool) {
