@@ -1,11 +1,11 @@
 dotfiles [![Build Status](https://travis-ci.org/pith/dotfiles.svg)](https://travis-ci.org/pith/dotfiles) [![Coverage Status](https://coveralls.io/repos/pith/dotfiles/badge.svg?branch=master)](https://coveralls.io/r/pith/dotfiles?branch=master)
 ========
 
-Managing your dotfiles around multiple machine can be a pain. That's why a lot of initiatives came up to fix this. Most of them are listed in the [unofficial guide to dotfiles on GitHub](https://dotfiles.github.io/). But what I miss in these projects is a portable (I mean, whithout requiring any dependency) dotfiles manager separated from the dotfiles config. I want it to be platform and shell independent. And I want to be able to pull updates from this manager whitout pulling someone else config.
+Managing your dotfiles around multiple machine can be a pain. That's why a lot of initiatives came up to fix this. Most of them are listed in the [unofficial guide to dotfiles on GitHub](https://dotfiles.github.io/). But what I miss in these projects is a portable (I mean, whithout requiring any dependency) dotfiles manager, separated from its creator's dotfiles config. I want it to be platform and shell independent. And I want to be able to pull updates from this manager whitout pulling someone else config.
 
 That's why I started this project based on the great work of [cowboy](https://github.com/cowboy/dotfiles). The goal here is to have a single dotfiles binary written in Go, doing all the dotfiles managing stuff for you.
 
-*State of the project*: This project is actively developed, but is not ready yet. All the contributions are welcomed.
+**State of the project**: This project is actively developed, but is not ready yet. All the contributions are welcomed (issues like patchs). Run this script at your own risks !
 
 ## Install
 
@@ -15,38 +15,65 @@ Since it is not released yet, you can only get it from source and it requires yo
 
 ## Usage
 
-*WARNING:* This might change quickly.
+Be sure to have the dotfiles command in your path, then run it.
 
-Create a new .dotfiles repo:
-
-    dotfiles create
-
-This create a `~/.dotfiles` directory with the following architecture:
+The dotfiles command provides few conventions to help you manage your dotfiles.
+If your dotfiles config is not setup the command will ask you if you want to
+clone an existing Git directory or creating a new config from scratch. The new
+config will look like this:
 
     ~/.dotfiles
-     |- bin
-     |- conf
-     |- copy
-     |- init
-     |- source
-     |- test
-     |- vendor
+      |_ bin
+      |_ conf
+      |_ copy
+      |_ init
+      |_ link
+      |_ test
+      |_ source
+      |_ vendor
+    
+**Copy**
 
-Add your config files in one of these directories according to what they do.
+All the files under the copy dir are copyed in the home directory. The first time,
+if the files already exist they will be backed up in the .dotfiles/backup directory.
+After if the files are different they will be copyied again.
 
-Then, when your config is ready, run the init command.
+**Link**
 
-    dotfiles init
+Same thing as for the copy directory, but the files will be linked.
 
-This will copy all the files in `copy` in `~/`, symlink all the files in `link` in `~/`, run the scripts in `init` and source those in `source`.
+**Init**
 
-## TODOs
+The command will prompt a menu to select the scripts to execute. If the scripts have
+been already run, they will be disable by default.
 
-* One command should be enough with good default and user inputs (remove the need to specify `create` and `init`)
-* Integrate git
-  - Allow to clone a .dotfiles project by passing a git URL as argument to the command
-  - Execute a git pull when setting up the config
-  - Allow the use of branches to get config profiles
+**Source**
+
+The files in the source directory should be sourced by the .zshrc (or .bashrc 
+depending on your favorite shell). This should not do more than that.
+
+## Test your config with Docker
+
+Before running the dotfiles command to setup your config, be sure to run it first.
+The easiest way to do it is by running the `dotfiles` command in a Docker container
+as follows.
+
+Build the image:
+
+    docker build -t yourname/dot .
+
+Then run it:
+
+    docker run -it --rm yourname/dot
+
+## Shorcut
+
+The first time you can pass a Git URL to the dotfiles command to directly clone it
+without waiting the command to prompt the options.
+
+## Screenshot
+
+![screenshot](./screenshot.png)
 
 ## Copyright and license
 This source code is copyrighted by Pierre THIROUIN and released under the terms of the [Mozilla Public License 2.0](LICENSE).
