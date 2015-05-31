@@ -1,3 +1,11 @@
+// Copyright (c) 2015 by Pierre Thirouin. All rights reserved.
+
+// This file is part of dotfiles, a simple dotfiles manager.
+
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 package main
 
 import (
@@ -116,7 +124,8 @@ func TestLn(t *testing.T) {
 	invalideCache()
 }
 
-func TestRn(t *testing.T) {
+// ignore
+func _TestRn(t *testing.T) {
 	initialize()
 
 	feedDir("init", 3)("echo foo")

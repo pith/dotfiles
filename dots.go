@@ -1,11 +1,21 @@
+// Copyright (c) 2015 by Pierre Thirouin. All rights reserved.
+
+// This file is part of dotfiles, a simple dotfiles manager.
+
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 package main
 
 import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 var console Console
@@ -157,11 +167,20 @@ func (dots Dotfiles) init() []byte {
 		if scripts[f] {
 			console.printHeader("Run " + filepath.Base(f))
 
-			output, err := exec.Command("/bin/bash", "-c", "source "+f).CombinedOutput()
-			out = append(out, output...)
+			cmd := exec.Command("/bin/bash", "-c", "source "+filepath.Join("init", filepath.Base(f)))
+			cmd.Dir = BaseDir
+			// var buf bytes.Buffer
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			err := cmd.Run()
+			//output := buf.Bytes()
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "# cd %s; %s\n", cmd.Dir, strings.Join(cmd.Args, " "))
+			} else {
 				cacheAdd(initRun, f)
 			}
+			// os.Stdout.Write(output)
+			// out = append(out, output...)
 		}
 	}
 

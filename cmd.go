@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -25,20 +26,47 @@ var (
 	quietMode = false
 )
 
-var help = `usage: dotfiles [command]
+var help = `usage: dotfiles
 
-Command list
+The dotfiles command provides few conventions to help you manage your dotfiles.
+If your dotfiles config is not setup the command will ask you if you want to
+clone an existing Git directory or creating a new config from scratch. The new
+config will look like this:
 
-Setup your machine:
-  get [url] Clone a dotfiles project at the given Git URL     
-  add      Add a file to one of the dotfiles directories
-  run      Initialize your config based on ~/.dotfiles
+    ~/.dotfiles
+      |_ bin
+      |_ conf
+      |_ copy
+      |_ init
+      |_ link
+      |_ test
+      |_ source
+      |_ vendor
+    
+## Copy
 
-Additional commands:
-  init     Run the init scripts
-  copy     Copy the files in ~/.dotfiles/copy to ~/
-  link     Link the files in ~/.dotfiles/link to ~/
+All the files under the copy dir are copyed in the home directory. The first time,
+if the files already exist they will be backed up in the .dotfiles/backup directory.
+After if the files are different they will be copyied again.
 
+## Link
+
+Same thing as for the copy directory, but the files will be linked.
+
+## Init
+
+The command will prompt a menu to select the scripts to execute. If the scripts have
+been already run, they will be disable by default.
+
+## Source
+
+The files in the source directory should be sourced by the .zshrc (or .bashrc 
+depending on your favorite shell). This should not do more than that.
+
+## Shorcut
+
+The first time you can pass a Git URL to the dotfiles command to directly clone it
+without waiting the command to prompt the options.
 `
 
 // Default paths
@@ -76,13 +104,30 @@ func main() {
 	changeRootDir(usr.HomeDir)
 
 	console.printHeader("    .: Dotfiles :.")
+	arg0 := flag.Arg(0)
+	if arg0 != "" {
+		if arg0 == "help" {
+			fmt.Println(help)
+			os.Exit(1)
+		} else if strings.HasPrefix(arg0, "git") ||
+			strings.HasPrefix(arg0, "https") ||
+			strings.HasPrefix(arg0, "http") {
+
+			cloneRepo(arg0)
+		}
+	} else {
+		setup()
+	}
+
 	run()
 }
 
-func run() {
-	// Not initialize yet
+func setup() {
+
 	_, err := os.Stat(BaseDir)
 	if err != nil && os.IsNotExist(err) {
+		// Not initialize yet
+
 		console.printHeader("Your .dotfiles repository is not setup yet.")
 		fmt.Printf("\nDo you want to (C)lone a dot repo, Create a (N)ew one, See the (H)elp or (Q)uit ? ")
 
@@ -108,9 +153,9 @@ func run() {
 		}
 
 	}
+}
 
-	// run the config
-
+func run() {
 	loadCache()
 
 	var dots Dotfiles
@@ -130,10 +175,25 @@ func cloneRepo(gitrepo string) {
 		log.Fatal("git is required to clone the dotfiles repo")
 	}
 
-	err = exec.Command(git, "clone", "--recursive", gitrepo, BaseDir).Run()
+	cmd := exec.Command(git, "clone", "--recursive", gitrepo, BaseDir)
+	cmd.Dir = RootDir
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	err = cmd.Run()
+	out := buf.Bytes()
 	if err != nil {
-		log.Fatalf("Failed to clone %s: %s", gitrepo, err)
+		fmt.Fprintf(os.Stderr, "# cd %s; %s\n", cmd.Dir, strings.Join(cmd.Args, " "))
+		os.Stderr.Write(out)
 	}
+
+	// cmd.Stdout = bufio.NewWriter(os.Stdout)
+	// cmd.Stderr = bufio.NewWriter(os.Stderr)
+
+	// err = cmd.Run()
+	// if err != nil {
+	// 	log.Fatalf("Failed to clone %s: %s", gitrepo, err)
+	// }
 
 	console.printHeader(BaseDir + " is ready !")
 }
