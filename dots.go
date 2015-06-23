@@ -142,6 +142,7 @@ func (dots Dotfiles) ln() {
 }
 
 func (dots Dotfiles) init() []byte {
+	// scripts to run
 	scripts := make(map[string]bool)
 
 	// By default run the script not cached
@@ -153,6 +154,7 @@ func (dots Dotfiles) init() []byte {
 		scripts[f] = !contains
 	}
 
+	// Ask the user if he want to update the list
 	console.printMenu(dots.Files[rn], scripts)
 
 	edited := console.editMenu(dots.Files[rn], scripts)
@@ -163,25 +165,28 @@ func (dots Dotfiles) init() []byte {
 
 	var out []byte
 
+	// run the selected scripts
 	for _, f := range dots.Files[rn] {
 		if scripts[f] {
 			console.printHeader("Run " + filepath.Base(f))
 
-			cmd := exec.Command("/bin/bash", "-c", "source "+filepath.Join("init", filepath.Base(f)))
+			path := filepath.Join("init", filepath.Base(f))
+			cmd := exec.Command("/bin/bash", "-c", "source "+path)
 			cmd.Dir = BaseDir
-			// var buf bytes.Buffer
+
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
+
 			err := cmd.Run()
-			//output := buf.Bytes()
+
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "# cd %s; %s\n", cmd.Dir, strings.Join(cmd.Args, " "))
-			} else {
-				cacheAdd(initRun, f)
 			}
-			// os.Stdout.Write(output)
-			// out = append(out, output...)
 		}
+	}
+
+	for _, f := range dots.Files[rn] {
+		cacheAdd(initRun, f)
 	}
 
 	return out

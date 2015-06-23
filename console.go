@@ -56,7 +56,7 @@ func (c Console) printMenu(scripts []string, shouldBeRun map[string]bool) {
 }
 
 func (c Console) editMenu(scripts []string, shouldBeRun map[string]bool) map[string]bool {
-	fmt.Printf("\nEdit scripts to run ? (Y/n): ")
+	fmt.Printf("\nEnter yes (y) to edit the list: ")
 	var input string
 	fmt.Scan(&input)
 
@@ -64,7 +64,7 @@ func (c Console) editMenu(scripts []string, shouldBeRun map[string]bool) map[str
 	if input == "Y" || input == "y" {
 		reader := bufio.NewReader(os.Stdin)
 
-		fmt.Printf("\nEnter the script ids that you want to toggle: ")
+		fmt.Printf("\nEnter the script ids to toggle: ")
 
 		text, err := reader.ReadString('\n')
 		if err != nil {
